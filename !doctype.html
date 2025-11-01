@@ -1,0 +1,568 @@
+<!doctype html>
+<html lang="my">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Daily Finance Pro — VIP Expense Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg1:#07122a; --bg2:#071a2f;
+    --card:#071827; --muted:#9fb4c8;
+    --accent:#facc15; --accent2:#22c55e;
+    --glass: rgba(255,255,255,0.03);
+    --glass-2: rgba(255,255,255,0.02);
+    font-family: Inter, system-ui, Arial, sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0;background:linear-gradient(180deg,var(--bg1),var(--bg2));color:#e6eef8}
+  .wrap{max-width:1150px;margin:28px auto;padding:22px;display:grid;grid-template-columns:1fr;gap:18px}
+  header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .brand{display:flex;gap:12px;align-items:center}
+  .logo{width:56px;height:56px;border-radius:12px;background:linear-gradient(135deg,var(--accent),#ff7a18);display:flex;align-items:center;justify-content:center;font-weight:800;color:#021}
+  h1{margin:0;font-size:1.05rem}
+  .subtitle{color:var(--muted);font-size:0.95rem}
+
+  /* layout */
+  .grid{display:grid;grid-template-columns:360px 1fr;gap:18px}
+  .panel{background:linear-gradient(180deg,var(--card),var(--glass-2));border-radius:12px;padding:16px;box-shadow:0 8px 30px rgba(2,6,23,0.6);border:1px solid rgba(255,255,255,0.02)}
+  /* Add form */
+  .form-row{display:flex;gap:10px;margin-bottom:10px}
+  label{display:block;font-size:0.85rem;color:var(--muted);margin-bottom:6px}
+  input[type="text"], input[type="number"], input[type="date"], select, textarea{
+    width:100%;padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit;font-size:0.95rem;
+  }
+  .btn{padding:10px 14px;border-radius:10px;border:none;background:linear-gradient(90deg,var(--accent),#ff7a18);color:#021;font-weight:700;cursor:pointer}
+  .btn.secondary{background:transparent;border:1px solid rgba(255,255,255,0.06);color:var(--muted)}
+  .row{display:flex;gap:10px;align-items:center}
+  .type-toggle{display:flex;gap:8px}
+  .chip{padding:8px 10px;border-radius:10px;background:var(--glass);cursor:pointer;border:1px solid rgba(255,255,255,0.02)}
+  .chip.active{background:linear-gradient(90deg,var(--accent2),#16a34a);color:#001}
+
+  /* summary */
+  .summary{display:flex;flex-direction:column;gap:10px}
+  .cards{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .card{padding:12px;border-radius:10px;background:linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01));display:flex;flex-direction:column;gap:8px}
+  .muted{color:var(--muted);font-size:0.85rem}
+  .big-number{font-size:1.4rem;font-weight:800}
+  .progress{height:10px;background:rgba(255,255,255,0.03);border-radius:8px;overflow:hidden}
+  .progress > i{display:block;height:100%;background:linear-gradient(90deg,var(--accent2),#06b6d4);width:30%}
+
+  /* history */
+  .history{overflow:auto;max-height:360px}
+  table{width:100%;border-collapse:collapse;color:#e6eef8}
+  th,td{padding:10px;border-bottom:1px solid rgba(255,255,255,0.02);text-align:left;font-size:0.95rem}
+  th{color:var(--muted);font-weight:600}
+  .income{color:var(--accent2);font-weight:700}
+  .expense{color:#fb7185;font-weight:700}
+  .action-btn{background:transparent;border:none;color:var(--muted);cursor:pointer;padding:6px;border-radius:8px}
+  .small-note{font-size:0.85rem;color:var(--muted)}
+
+  /* charts */
+  .charts{display:grid;grid-template-columns:1fr 360px;gap:18px}
+  canvas{background:transparent;border-radius:8px;padding:8px}
+
+  footer{display:flex;justify-content:space-between;align-items:center;color:var(--muted);font-size:0.9rem;margin-top:10px}
+
+  /* responsive */
+  @media (max-width:960px){
+    .grid{grid-template-columns:1fr; padding-bottom:30px}
+    .charts{grid-template-columns:1fr}
+  }
+  /* subtle animations */
+  .fade-in{animation:fadeIn .45s ease both}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+</style>
+</head>
+<body>
+  <div class="wrap fade-in" role="main">
+    <header>
+      <div class="brand">
+        <div class="logo">DP</div>
+        <div>
+          <h1>Daily Finance Pro — VIP</h1>
+          <div class="subtitle">တစ်နေ့တာ အသုံးစရိတ်နှင့် တစ်လစာ အကျဉ်းချုပ် — Local-only, Privacy-first</div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:10px;align-items:center">
+        <div class="small-note">Month:</div>
+        <select id="monthSelect" aria-label="Select month"></select>
+        <button class="btn" id="exportBtn" title="Export CSV">Export CSV</button>
+      </div>
+    </header>
+
+    <div class="grid">
+      <!-- Left: Add + Summary + History -->
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <!-- Add Panel -->
+        <div class="panel">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+            <div style="font-weight:800">Add Transaction</div>
+            <div class="small-note">Local only · data saved to browser</div>
+          </div>
+
+          <div>
+            <label>Type</label>
+            <div class="type-toggle">
+              <div class="chip active" data-type="income" id="typeIncome">Income</div>
+              <div class="chip" data-type="expense" id="typeExpense">Expense</div>
+            </div>
+          </div>
+
+          <div style="margin-top:10px">
+            <label>Amount (MMK)</label>
+            <input id="amount" type="number" placeholder="e.g. 25000" />
+          </div>
+
+          <div class="form-row">
+            <div style="flex:1">
+              <label>Category</label>
+              <select id="category">
+                <!-- categories prefilled -->
+                <option>Salary</option>
+                <option>Food</option>
+                <option>Transport</option>
+                <option>Shopping</option>
+                <option>Rent</option>
+                <option>Utilities</option>
+                <option>Entertainment</option>
+                <option>Other</option>
+              </select>
+            </div>
+            <div style="width:170px">
+              <label>Date</label>
+              <input id="date" type="date" />
+            </div>
+          </div>
+
+          <div style="margin-top:10px">
+            <label>Note</label>
+            <input id="note" type="text" placeholder="Optional note (e.g. lunch at Htike)" />
+          </div>
+
+          <div style="display:flex;gap:8px;margin-top:12px">
+            <button class="btn" id="saveBtn">Save Transaction</button>
+            <button class="btn secondary" id="clearBtn">Clear All</button>
+            <button class="btn secondary" id="importDemo">Load Demo</button>
+          </div>
+        </div>
+
+        <!-- Summary Panel -->
+        <div class="panel summary">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div style="font-weight:800">Summary</div>
+            <div class="small-note" id="summaryMonthLabel"></div>
+          </div>
+          <div class="cards">
+            <div class="card">
+              <div class="muted">Total Income</div>
+              <div class="big-number" id="totalIncome">0</div>
+              <div class="small-note">All recorded income this month</div>
+            </div>
+            <div class="card">
+              <div class="muted">Total Expense</div>
+              <div class="big-number" id="totalExpense">0</div>
+              <div class="small-note">All recorded expense this month</div>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:12px;margin-top:12px;align-items:center">
+            <div style="flex:1">
+              <div class="muted">Balance</div>
+              <div style="display:flex;align-items:center;justify-content:space-between">
+                <div class="big-number" id="balance">0</div>
+                <div class="small-note" id="balancePct"></div>
+              </div>
+              <div class="progress" style="margin-top:8px"><i id="progressBar"></i></div>
+            </div>
+            <div style="width:140px">
+              <div class="muted">Transactions</div>
+              <div style="font-weight:800;font-size:1.2rem" id="txCount">0</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- History -->
+        <div class="panel">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+            <div style="font-weight:800">History</div>
+            <div class="small-note">Edit / Delete entries</div>
+          </div>
+
+          <div class="history">
+            <table id="historyTbl" role="table" aria-label="transaction history">
+              <thead><tr><th>Date</th><th>Type</th><th>Category</th><th>Note</th><th>Amount</th><th></th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Charts -->
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div class="panel charts">
+          <div style="padding:8px">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <div style="font-weight:800">Monthly Insights</div>
+              <div class="small-note">Income vs Expense • Category breakdown</div>
+            </div>
+            <canvas id="barChart" aria-label="Income vs Expense by day" role="img"></canvas>
+          </div>
+
+          <div style="padding:8px">
+            <div style="font-weight:800">By Category</div>
+            <canvas id="pieChart" aria-label="Category breakdown" role="img"></canvas>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <div style="font-weight:800">Quick Stats</div>
+            <div class="small-note">This month</div>
+          </div>
+          <div style="display:flex;gap:12px;flex-wrap:wrap">
+            <div style="flex:1;min-width:160px" class="card">
+              <div class="muted">Largest Expense</div>
+              <div id="largestExpense" class="big-number">-</div>
+            </div>
+            <div style="flex:1;min-width:160px" class="card">
+              <div class="muted">Average Daily Expense</div>
+              <div id="avgExpense" class="big-number">-</div>
+            </div>
+            <div style="flex:1;min-width:160px" class="card">
+              <div class="muted">Days Recorded</div>
+              <div id="daysRecorded" class="big-number">-</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <footer>
+      <div>© Daily Finance Pro · Local data only</div>
+      <div class="small-note">Made with ♥ — Export / Backup available</div>
+    </footer>
+  </div>
+
+<script>
+/* -------------------------
+  VIP Expense Tracker (Vanilla JS)
+  - localStorage key: finance_vip
+  - Single-file, Vercel-ready
+-------------------------*/
+
+const STORAGE_KEY = 'finance_vip';
+
+// DOM
+const typeIncome = document.getElementById('typeIncome');
+const typeExpense = document.getElementById('typeExpense');
+const amountEl = document.getElementById('amount');
+const categoryEl = document.getElementById('category');
+const dateEl = document.getElementById('date');
+const noteEl = document.getElementById('note');
+const saveBtn = document.getElementById('saveBtn');
+const clearBtn = document.getElementById('clearBtn');
+const importDemoBtn = document.getElementById('importDemo');
+const historyBody = document.querySelector('#historyTbl tbody');
+const totalIncomeEl = document.getElementById('totalIncome');
+const totalExpenseEl = document.getElementById('totalExpense');
+const balanceEl = document.getElementById('balance');
+const progressBar = document.getElementById('progressBar');
+const txCountEl = document.getElementById('txCount');
+const monthSelect = document.getElementById('monthSelect');
+const summaryMonthLabel = document.getElementById('summaryMonthLabel');
+const exportBtn = document.getElementById('exportBtn');
+const largestExpenseEl = document.getElementById('largestExpense');
+const avgExpenseEl = document.getElementById('avgExpense');
+const daysRecordedEl = document.getElementById('daysRecorded');
+
+let currentType = 'income';
+let data = []; // array of transactions
+let editingId = null;
+let barChart, pieChart;
+
+// categories
+const categories = ['Salary','Food','Transport','Shopping','Rent','Utilities','Entertainment','Other'];
+
+// default date = today
+dateEl.value = new Date().toISOString().slice(0,10);
+
+// initialize months dropdown (last 12 months)
+function initMonths(){
+  const now = new Date();
+  for(let i=0;i<12;i++){
+    const dt = new Date(now.getFullYear(), now.getMonth()-i, 1);
+    const key = dt.toISOString().slice(0,7);
+    const label = dt.toLocaleString('default',{month:'short',year:'numeric'});
+    const opt = document.createElement('option');
+    opt.value = key;
+    opt.textContent = label;
+    monthSelect.appendChild(opt);
+  }
+  monthSelect.value = new Date().toISOString().slice(0,7);
+  summaryMonthLabel.textContent = monthSelect.options[monthSelect.selectedIndex].textContent;
+}
+initMonths();
+
+// UI toggle
+function setType(t){
+  currentType = t;
+  document.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));
+  if(t==='income') typeIncome.classList.add('active'); else typeExpense.classList.add('active');
+}
+typeIncome.onclick = ()=>setType('income');
+typeExpense.onclick = ()=>setType('expense');
+
+// load/save
+function loadData(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    data = raw ? JSON.parse(raw) : [];
+  }catch(e){ data = [];}
+}
+function saveData(){
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+}
+
+// helpers
+function uid(){ return 'id_'+Math.random().toString(36).slice(2,9); }
+function fmt(n){ return Number(n).toLocaleString('en-US'); }
+function money(n){
+  const v = Number(n) || 0;
+  return v>=0 ? fmt(v) : '-'+fmt(Math.abs(v));
+}
+
+// add transaction
+saveBtn.addEventListener('click', ()=>{
+  const amt = Number(amountEl.value);
+  if(!amt || amt<=0){ alert('Please enter valid amount'); amountEl.focus(); return; }
+  const tx = {
+    id: editingId || uid(),
+    type: currentType,
+    amount: amt,
+    category: categoryEl.value || 'Other',
+    note: noteEl.value || '',
+    date: dateEl.value || new Date().toISOString().slice(0,10),
+    createdAt: new Date().toISOString()
+  };
+  if(editingId){
+    data = data.map(d=>d.id===editingId?tx:d);
+    editingId = null;
+    saveBtn.textContent = 'Save Transaction';
+  } else {
+    data.unshift(tx);
+  }
+  saveData();
+  renderAll();
+  // clear inputs
+  amountEl.value=''; noteEl.value='';
+});
+
+// clear all
+clearBtn.addEventListener('click', ()=>{
+  if(!confirm('Clear ALL local data? This cannot be undone.')) return;
+  data = [];
+  saveData();
+  renderAll();
+});
+
+// import demo
+importDemoBtn.addEventListener('click', ()=>{
+  if(!confirm('Load demo data? This will append demo entries.')) return;
+  const now = new Date();
+  const demo = [
+    {id:uid(),type:'income',amount:300000,category:'Salary',note:'Oct salary',date:formatDateOffset(0)},
+    {id:uid(),type:'expense',amount:4500,category:'Food',note:'Breakfast',date:formatDateOffset(0)},
+    {id:uid(),type:'expense',amount:12000,category:'Transport',note:'Taxi',date:formatDateOffset(-1)},
+    {id:uid(),type:'expense',amount:50000,category:'Rent',note:'Room rent',date:formatDateOffset(-3)},
+    {id:uid(),type:'income',amount:50000,category:'Other',note:'Freelance',date:formatDateOffset(-5)},
+    {id:uid(),type:'expense',amount:15000,category:'Shopping',note:'Clothes',date:formatDateOffset(-10)},
+  ];
+  data = demo.concat(data);
+  saveData();
+  renderAll();
+});
+
+// format helper
+function formatDateOffset(days){
+  const d = new Date();
+  d.setDate(d.getDate()+days);
+  return d.toISOString().slice(0,10);
+}
+
+// render functions
+function renderAll(){
+  loadData();
+  renderHistory();
+  renderSummary();
+  renderCharts();
+}
+function renderHistory(){
+  historyBody.innerHTML='';
+  const selectedMonth = monthSelect.value; // YYYY-MM
+  const filtered = data.filter(tx => tx.date.slice(0,7)===selectedMonth);
+  filtered.forEach(tx=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${tx.date}</td>
+      <td class="${tx.type==='income'?'income':'expense'}">${tx.type.toUpperCase()}</td>
+      <td>${tx.category}</td>
+      <td>${tx.note || '-'}</td>
+      <td style="text-align:right">${tx.type==='expense' ? '-' : ''}${fmt(tx.amount)}</td>
+      <td style="text-align:right">
+        <button class="action-btn" data-id="${tx.id}" data-action="edit" title="Edit">✏️</button>
+        <button class="action-btn" data-id="${tx.id}" data-action="del" title="Delete">🗑️</button>
+      </td>`;
+    historyBody.appendChild(tr);
+  });
+  // actions
+  historyBody.querySelectorAll('.action-btn').forEach(btn=>{
+    btn.onclick = (e)=>{
+      const id = btn.dataset.id;
+      const action = btn.dataset.action;
+      if(action==='del'){
+        if(!confirm('Delete this transaction?')) return;
+        data = data.filter(d=>d.id!==id);
+        saveData(); renderAll();
+      } else if(action==='edit'){
+        const tx = data.find(d=>d.id===id);
+        if(!tx) return;
+        editingId = tx.id;
+        setType(tx.type);
+        amountEl.value = tx.amount;
+        categoryEl.value = tx.category;
+        dateEl.value = tx.date;
+        noteEl.value = tx.note;
+        saveBtn.textContent = 'Update Transaction';
+        window.scrollTo({top:0,behavior:'smooth'});
+      }
+    };
+  });
+}
+
+function renderSummary(){
+  const selectedMonth = monthSelect.value;
+  const monthly = data.filter(tx=>tx.date.slice(0,7)===selectedMonth);
+  const income = monthly.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0);
+  const expense = monthly.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
+  const balance = income - expense;
+  totalIncomeEl.textContent = fmt(income);
+  totalExpenseEl.textContent = fmt(expense);
+  balanceEl.textContent = money(balance);
+  txCountEl.textContent = monthly.length;
+  summaryMonthLabel.textContent = monthSelect.options[monthSelect.selectedIndex].textContent;
+
+  // progress: percent of income used
+  const pct = income>0 ? Math.min(100, Math.round((expense/income)*100)) : (expense>0?100:0);
+  progressBar.style.width = pct + '%';
+  document.getElementById('balancePct').textContent = pct + '% used';
+
+  // quick stats
+  const largestExpense = monthly.filter(t=>t.type==='expense').sort((a,b)=>b.amount-a.amount)[0];
+  largestExpenseEl.textContent = largestExpense ? '-'+fmt(largestExpense.amount) : '-';
+  const days = [...new Set(monthly.map(m=>m.date))].length;
+  daysRecordedEl.textContent = days || 0;
+  const avg = days ? Math.round(monthly.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0)/days) : 0;
+  avgExpenseEl.textContent = avg? fmt(avg) : '-';
+}
+
+function renderCharts(){
+  const selectedMonth = monthSelect.value;
+  const monthly = data.filter(tx=>tx.date.slice(0,7)===selectedMonth);
+
+  // bar chart: days in month (day -> income/expense)
+  const [labels, incData, expData] = buildDaySeries(selectedMonth, monthly);
+
+  if(barChart) barChart.destroy();
+  const ctx = document.getElementById('barChart');
+  barChart = new Chart(ctx, {
+    type:'bar',
+    data:{
+      labels: labels,
+      datasets:[
+        { label:'Income', data: incData, backgroundColor:'#22c55e', stack:'s1' },
+        { label:'Expense', data: expData, backgroundColor:'#fb7185', stack:'s1' }
+      ]
+    },
+    options:{
+      interaction:{mode:'index',axis:'x'},
+      plugins:{legend:{labels:{color:'#e6eef8'}}},
+      scales:{ x:{ ticks:{color:'#e6eef8'}}, y:{ ticks:{color:'#e6eef8'}, beginAtZero:true } }
+    }
+  });
+
+  // pie chart: category breakdown
+  const catMap = {};
+  monthly.forEach(t=>{ if(!catMap[t.category]) catMap[t.category]=0; if(t.type==='expense') catMap[t.category]+=t.amount; else catMap[t.category]-=0;});
+  const catLabels = Object.keys(catMap);
+  const catValues = catLabels.map(k=>catMap[k]);
+  if(pieChart) pieChart.destroy();
+  const ctx2 = document.getElementById('pieChart');
+  pieChart = new Chart(ctx2, {
+    type:'doughnut',
+    data:{ labels: catLabels, datasets:[{ data: catValues, backgroundColor: generatePalette(catLabels.length)}] },
+    options:{ plugins:{legend:{position:'bottom',labels:{color:'#e6eef8'}}} }
+  });
+}
+
+// helpers for charts
+function buildDaySeries(monthKey, arr){
+  // monthKey: "YYYY-MM"
+  const [y,m] = monthKey.split('-').map(Number);
+  const days = new Date(y,m,0).getDate();
+  const labels = [], inc = [], exp = [];
+  for(let d=1;d<=days;d++){
+    labels.push(String(d));
+    inc.push(0); exp.push(0);
+  }
+  arr.forEach(t=>{
+    const day = Number(t.date.slice(8,10));
+    if(t.type==='income') inc[day-1] += t.amount;
+    else exp[day-1] += t.amount;
+  });
+  return [labels, inc, exp];
+}
+function generatePalette(n){
+  const base = ['#ff7a18','#f97316','#f59e0b','#facc15','#22c55e','#06b6d4','#60a5fa','#7c3aed','#ef4444','#fb7185'];
+  const res = [];
+  for(let i=0;i<n;i++) res.push(base[i%base.length]);
+  return res;
+}
+
+// month change
+monthSelect.addEventListener('change', ()=>{ renderAll(); });
+
+// export CSV
+exportBtn.addEventListener('click', ()=>{
+  const selectedMonth = monthSelect.value;
+  const rows = data.filter(tx=>tx.date.slice(0,7)===selectedMonth);
+  if(rows.length===0){ alert('No data this month'); return; }
+  let csv = 'date,type,category,note,amount\n';
+  rows.forEach(r=> csv += `${r.date},${r.type},${r.category},"${r.note.replace(/"/g,'""')}",${r.amount}\n`);
+  const blob = new Blob([csv],{type:'text/csv'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `finance_${selectedMonth}.csv`;
+  a.click();
+});
+
+// initial load
+loadData();
+renderAll();
+
+// clear unused button shortcuts
+document.addEventListener('keydown', (e)=>{ if(e.key==='Escape'){ editingId=null; saveBtn.textContent='Save Transaction'; } });
+
+// utility: clear all local storage (button)
+clearBtn.addEventListener('click', ()=>{ /* handled above */ });
+
+// attach delete/edit via event delegation (already in renderHistory)
+
+// on window resize, update charts
+window.addEventListener('resize', ()=>{ if(barChart) barChart.resize(); if(pieChart) pieChart.resize(); });
+
+</script>
+</body>
+</html>
